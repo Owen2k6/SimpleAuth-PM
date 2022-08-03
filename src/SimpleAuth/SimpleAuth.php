@@ -36,7 +36,6 @@ use SimpleAuth\provider\DummyDataProvider;
 use SimpleAuth\provider\MySQLDataProvider;
 use SimpleAuth\provider\SQLite3DataProvider;
 use SimpleAuth\provider\YAMLDataProvider;
-use SimpleAuth\task\ShowMessageTask;
 
 class SimpleAuth extends PluginBase{
 
@@ -49,13 +48,8 @@ class SimpleAuth extends PluginBase{
 	/** @var DataProvider */
 	protected $provider;
 
-	protected $blockPlayers = 6;
-	protected $blockSessions = [];
-
 	/** @var string[] */
 	protected $messages = [];
-
-	protected $messageTask = null;
 
 	/**
 	 * @api
@@ -101,12 +95,8 @@ class SimpleAuth extends PluginBase{
 			$player->removeAttachment($attachment);
 			unset($this->needAuth[spl_object_hash($player)]);
 		}
-		$this->provider->updatePlayer($player, $player->getUniqueId()->toString(), time());
+		$this->provider->updatePlayer($player, $player->getAddress(), time());
 		$player->sendMessage(TextFormat::GREEN . $this->getMessage("login.success"));
-
-		$this->getMessageTask()->removePlayer($player);
-
-		unset($this->blockSessions[$player->getAddress() . ":" . strtolower($player->getName())]);
 
 		return true;
 	}
@@ -134,30 +124,7 @@ class SimpleAuth extends PluginBase{
 
 		$this->sendAuthenticateMessage($player);
 
-		$this->getMessageTask()->addPlayer($player);
-
 		return true;
-	}
-
-	public function tryAuthenticatePlayer(Player $player){
-		if($this->blockPlayers <= 0 and $this->isPlayerAuthenticated($player)){
-			return;
-		}
-
-		if(count($this->blockSessions) > 2048){
-			$this->blockSessions = [];
-		}
-
-		if(!isset($this->blockSessions[$player->getAddress()])){
-			$this->blockSessions[$player->getAddress() . ":" . strtolower($player->getName())] = 1;
-		}else{
-			$this->blockSessions[$player->getAddress() . ":" . strtolower($player->getName())]++;
-		}
-
-		if($this->blockSessions[$player->getAddress() . ":" . strtolower($player->getName())] > $this->blockPlayers){
-			$player->kick($this->getMessage("login.error.block"), true);
-			$this->getServer()->getNetwork()->blockAddress($player->getAddress(), 600);
-		}
 	}
 
 	/**
@@ -221,17 +188,15 @@ class SimpleAuth extends PluginBase{
 
 	public function closePlayer(Player $player){
 		unset($this->needAuth[spl_object_hash($player)]);
-		$this->getMessageTask()->removePlayer($player);
 	}
 
 	public function sendAuthenticateMessage(Player $player){
 		$config = $this->provider->getPlayer($player);
-		$player->sendMessage(TextFormat::ITALIC . TextFormat::GRAY . $this->getMessage("join.message1"));
-		$player->sendMessage(TextFormat::ITALIC . TextFormat::GRAY . $this->getMessage("join.message2"));
+		$player->sendMessage($this->getMessage("join.message"));
 		if($config === null){
-			$player->sendMessage(TextFormat::YELLOW . $this->getMessage("join.register"));
+			$player->sendMessage($this->getMessage("join.register"));
 		}else{
-			$player->sendMessage(TextFormat::YELLOW . $this->getMessage("join.login"));
+			$player->sendMessage($this->getMessage("join.login"));
 		}
 	}
 
@@ -255,7 +220,6 @@ class SimpleAuth extends PluginBase{
 					if(hash_equals($data["hash"], $this->hash(strtolower($sender->getName()), $password)) and $this->authenticatePlayer($sender)){
 						return true;
 					}else{
-						$this->tryAuthenticatePlayer($sender);
 						$sender->sendMessage(TextFormat::RED . $this->getMessage("login.error.password"));
 
 						return true;
@@ -336,8 +300,6 @@ class SimpleAuth extends PluginBase{
 		$loginCommand->setDescription($this->getMessage("login.description"));
 		$loginCommand->setPermissionMessage($this->getMessage("login.permission"));
 
-		$this->blockPlayers = (int) $this->getConfig()->get("blockAfterFail", 6);
-
 		$provider = $this->getConfig()->get("dataProvider");
 		unset($this->provider);
 		switch(strtolower($provider)){
@@ -376,8 +338,6 @@ class SimpleAuth extends PluginBase{
 	public function onDisable(){
 		$this->getServer()->getPluginManager();
 		$this->provider->close();
-		$this->messageTask = null;
-		$this->blockSessions = [];
 	}
 
 	public static function orderPermissionsCallback($perm1, $perm2){
@@ -417,7 +377,7 @@ class SimpleAuth extends PluginBase{
 
 		unset($permissions["simpleauth.chat"]);
 		unset($permissions["simpleauth.move"]);
-		unset($permissions["simpleauth.lastid"]);
+		unset($permissions["simpleauth.lastip"]);
 
 		//Do this because of permission manager plugins
 		if($this->getConfig()->get("disableRegister") === true){
@@ -450,17 +410,5 @@ class SimpleAuth extends PluginBase{
 	 */
 	private function hash($salt, $password){
 		return bin2hex(hash("sha512", $password . $salt, true) ^ hash("whirlpool", $salt . $password, true));
-	}
-
-	/**
-	 * @return ShowMessageTask
-	 */
-	protected function getMessageTask(){
-		if($this->messageTask === null){
-			$this->messageTask = new ShowMessageTask($this);
-			$this->getServer()->getScheduler()->scheduleRepeatingTask($this->messageTask, 10);
-		}
-
-		return $this->messageTask;
 	}
 }
