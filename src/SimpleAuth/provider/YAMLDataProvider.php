@@ -38,7 +38,7 @@ class YAMLDataProvider implements DataProvider{
 		if($name === ""){
 			return null;
 		}
-		$path = $this->plugin->getDataFolder() . "players/" . $name{0} . "/$name.yml";
+		$path = $this->plugin->getDataFolder() . "players/" . $name[0] . "/$name.yml";
 		if(!file_exists($path)){
 			return null;
 		}else{
@@ -50,18 +50,18 @@ class YAMLDataProvider implements DataProvider{
 	public function isPlayerRegistered(IPlayer $player){
 		$name = trim(strtolower($player->getName()));
 
-		return file_exists($this->plugin->getDataFolder() . "players/" . $name{0} . "/$name.yml");
+		return file_exists($this->plugin->getDataFolder() . "players/" . $name[0] . "/$name.yml");
 	}
 
 	public function unregisterPlayer(IPlayer $player){
 		$name = trim(strtolower($player->getName()));
-		@unlink($this->plugin->getDataFolder() . "players/" . $name{0} . "/$name.yml");
+		@unlink($this->plugin->getDataFolder() . "players/" . $name[0] . "/$name.yml");
 	}
 
 	public function registerPlayer(IPlayer $player, $hash){
 		$name = trim(strtolower($player->getName()));
-		@mkdir($this->plugin->getDataFolder() . "players/" . $name{0} . "/");
-		$data = new Config($this->plugin->getDataFolder() . "players/" . $name{0} . "/$name.yml", Config::YAML);
+		@mkdir($this->plugin->getDataFolder() . "players/" . $name[0] . "/");
+		$data = new Config($this->plugin->getDataFolder() . "players/" . $name[0] . "/$name.yml", Config::YAML);
 		$data->set("registerdate", time());
 		$data->set("logindate", time());
 		$data->set("lastip", null);
@@ -73,7 +73,7 @@ class YAMLDataProvider implements DataProvider{
 
 	public function savePlayer(IPlayer $player, array $config){
 		$name = trim(strtolower($player->getName()));
-		$data = new Config($this->plugin->getDataFolder() . "players/" . $name{0} . "/$name.yml", Config::YAML);
+		$data = new Config($this->plugin->getDataFolder() . "players/" . $name[0] . "/$name.yml", Config::YAML);
 		$data->setAll($config);
 		$data->save();
 	}
